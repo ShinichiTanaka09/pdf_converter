@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>フィードバックシート PDF保存ツール</title>
+  <style>
+    :root{
+      --accent:#81d8d0;
+      --border:#d8e7ec;
+      --text:#1f2a30;
+      --muted:#66757f;
+      --bg:#f7fbfc;
+      --panel:#ffffff;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Yu Gothic","Hiragino Sans","Meiryo",sans-serif;
+      color:var(--text);
+      background:var(--bg);
+    }
+    .wrap{max-width:1280px;margin:0 auto;padding:24px;}
+    .card{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:18px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.05);
+      overflow:hidden;
+    }
+    .head{
+      padding:18px 22px;
+      border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg,#fafdfe 0%,#f3fbfd 100%);
+    }
+    .head h1{margin:0;font-size:20px;}
+    .head p{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.6;}
+    .controls{
+      display:flex;gap:12px;flex-wrap:wrap;padding:16px 22px;border-bottom:1px solid var(--border);align-items:center;
+    }
+    button{
+      appearance:none;border:none;border-radius:10px;padding:12px 18px;background:var(--accent);color:#fff;
+      font-size:14px;font-weight:700;cursor:pointer;
+    }
+    button.secondary{background:#eaf6f9;color:#24505a;}
+    textarea{
+      width:100%;min-height:260px;border:none;border-bottom:1px solid var(--border);padding:18px 22px;resize:vertical;
+      font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:#20323a;outline:none;
+    }
+    .previewWrap{padding:22px;background:#eef6f8;}
+    .previewLabel{margin:0 0 12px;font-size:13px;color:var(--muted);}
+    .previewFrame{
+      width:210mm;
+      min-height:297mm;
+      margin:0 auto;
+      background:#fff;
+      border:1px solid #d9d9d9;
+      box-shadow:0 8px 24px rgba(0,0,0,0.08);
+      overflow:hidden;
+      transform-origin: top center;
+    }
+    iframe{
+      width:210mm;
+      height:297mm;
+      border:none;
+      display:block;
+      background:#fff;
+    }
+    .hint{padding:0 22px 22px;font-size:12px;color:var(--muted);line-height:1.7;}
+    code{background:#f1f6f8;padding:2px 6px;border-radius:6px;}
+    @media (max-width:900px){
+      .wrap{padding:14px;}
+      .previewWrap{padding:14px;overflow:auto;}
+      .previewFrame{transform:scale(.82);margin-left:auto;margin-right:auto;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="head">
+        <h1>フィードバックシート PDF保存ツール</h1>
+        <p>このテンプレートのように <code>@page</code> と A4 指定が入ったHTML向けです。見た目を保つため、PDF化はスクリーンショット変換ではなく、HTMLをそのまま印刷用表示して保存します。</p>
+      </div>
+
+      <div class="controls">
+        <button class="secondary" id="previewBtn">プレビュー更新</button>
+        <button id="pdfBtn">PDF保存</button>
+      </div>
+
+      <textarea id="htmlInput" placeholder="ここにHTML全文を貼り付けてください。"></textarea>
+
+      <div class="previewWrap">
+        <p class="previewLabel">プレビュー</p>
+        <div class="previewFrame">
+          <iframe id="previewFrame" title="preview"></iframe>
+        </div>
+      </div>
+
+      <div class="hint">
+        PDF保存を押すと印刷画面が開きます。<br>
+        その際、印刷設定で <strong>ヘッダとフッタ</strong> をオフにすると、ページ数やURLが入りません。<br>
+        この方法が、このテンプレートでは最も見た目が崩れにくいです。
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById('htmlInput');
+    const previewBtn = document.getElementById('previewBtn');
+    const pdfBtn = document.getElementById('pdfBtn');
+    const previewFrame = document.getElementById('previewFrame');
+
+    function normalizeHtml(raw){
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(raw, 'text/html');
+
+      // 印刷時のヘッダ余白などを増やさないための補助CSS
+      const extraStyle = doc.createElement('style');
+      extraStyle.textContent = `
+        html, body { margin: 0 !important; padding: 0 !important; }
+      `;
+      doc.head.appendChild(extraStyle);
+
+      return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+    }
+
+    function updatePreview(){
+      const raw = input.value.trim();
+      if(!raw){
+        const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+        doc.open();
+        doc.write('');
+        doc.close();
+        return;
+      }
+      const normalized = normalizeHtml(raw);
+      const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+      doc.open();
+      doc.write(normalized);
+      doc.close();
+    }
+
+    function savePdf(){
+      const raw = input.value.trim();
+      if(!raw){
+        alert('HTMLを入力してください。');
+        return;
+      }
+
+      const normalized = normalizeHtml(raw);
+      const win = window.open('', '_blank');
+      if(!win){
+        alert('ポップアップがブロックされました。ブラウザでこのページのポップアップを許可してください。');
+        return;
+      }
+
+      win.document.open();
+      win.document.write(normalized);
+      win.document.close();
+
+      const triggerPrint = () => {
+        try{
+          win.focus();
+          win.print();
+        } catch(e){
+          console.error(e);
+        }
+      };
+
+      // 読み込み完了後に印刷
+      if (win.document.readyState === 'complete') {
+        setTimeout(triggerPrint, 300);
+      } else {
+        win.onload = () => setTimeout(triggerPrint, 300);
+      }
+    }
+
+    previewBtn.addEventListener('click', updatePreview);
+    pdfBtn.addEventListener('click', savePdf);
+  </script>
+</body>
+</html>
